@@ -11,6 +11,7 @@ W_R = 1
 B_R = -1
 W_Q = 2
 B_Q = -2
+EMPTY_POLE = 0
 
 MOVE_BLACK = 1
 MOVE_WHITE = -1
@@ -24,8 +25,9 @@ class Class_Checkers:
         self.screen = screen
         self.board = board
         # Флаг для отслеживания текущей стороны
-        self.is_white_turn = MOVE_BLACK  # Если 1, ход белых, если -1, ход черных
+        self.is_white_turn = MOVE_WHITE  # Если 1, ход белых, если -1, ход черных
         self.selected_checker = None  # Ссылка на выбранную шашку
+        self.count_move = 0
 
         self.valid_moves = []  # Список допустимых ходов для выбранной шашки
         self.capture_moves = []  # Список допустимых рубок для выбранной шашки
@@ -43,7 +45,7 @@ class Class_Checkers:
         col = position[0] // SQUARE_SIZE
         row = position[1] // SQUARE_SIZE
 
-        if self.selected_checker:                   # Если выбрана шашка
+        if self.selected_checker is not None:       # Если выбрана шашка
             if (row, col) in self.valid_moves:      # Если клик по допустимому ходу
                 self.make_move(row, col, self.board.boards[(row+col) % 2])
             elif (row, col) in self.capture_moves:  # Если клик по допустимой рубке
@@ -83,29 +85,29 @@ class Class_Checkers:
 
         simple_move = row + 1 * self.is_white_turn
         if 0 <= simple_move < ROWS:
-            if col - 1 >= 0 and board[simple_move][col - 1] == 0:
+            if col - 1 >= 0 and board[simple_move][col - 1] == EMPTY_POLE:
                 self.valid_moves.append((simple_move, col - 1))  # Ход на пустую клетку
-            if col + 1 < COLS and board[simple_move][col + 1] == 0:
+            if col + 1 < COLS and board[simple_move][col + 1] == EMPTY_POLE:
                 self.valid_moves.append((simple_move, col + 1))  # Ход на пустую клетку
 
         # Логика для рубки (если есть шашка противника, через которую можно перепрыгнуть)
         capture = row + 2 * self.is_white_turn
         if 0 <= capture < ROWS:
             if col - 2 >= 0 and (board[simple_move][col - 1] in checkers_vrags) \
-                    and board[capture][col - 2] == 0:
+                    and board[capture][col - 2] == EMPTY_POLE:
                 self.capture_moves.append((capture, col - 2))  # Рубка
             if col + 2 < COLS and (board[simple_move][col + 1] in checkers_vrags) \
-                    and board[capture][col + 2] == 0:
+                    and board[capture][col + 2] == EMPTY_POLE:
                 self.capture_moves.append((capture, col + 2))  # Рубка
 
         capture = row - 2 * self.is_white_turn
         simple_move = row - 1 * self.is_white_turn
         if 0 <= capture < ROWS:
             if col - 2 >= 0 and (board[simple_move][col - 1] in checkers_vrags) \
-                    and board[capture][col - 2] == 0:
+                    and board[capture][col - 2] == EMPTY_POLE:
                 self.capture_moves.append((capture, col - 2))  # Рубка
             if col + 2 < COLS and (board[simple_move][col + 1] in checkers_vrags) \
-                    and board[capture][col + 2] == 0:
+                    and board[capture][col + 2] == EMPTY_POLE:
                 self.capture_moves.append((capture, col + 2))  # Рубка
 
     def check_queen_moves(self, row, col, board):
@@ -117,18 +119,20 @@ class Class_Checkers:
                       (1, 1)]  # Направления: вверх-влево, вверх-вправо, вниз-влево, вниз-вправо
         for dr, dc in directions:
             r, c = row, col
+            flag_move = True
             while True:
                 r += dr
                 c += dc
                 if 0 <= r < ROWS and 0 <= c < COLS:
-                    if board[r][c] == 0:
+                    if board[r][c] == EMPTY_POLE and flag_move:
                         self.valid_moves.append((r, c))
                     elif 0 <= r + dr < ROWS and 0 <= c + dc < COLS:
-                        if self.is_white_turn == MOVE_WHITE and board[r][c] in [B_R, B_Q]:
-                            if board[r + dr][c + dc] == 0:
+                        flag_move = False
+                        if self.is_white_turn == MOVE_WHITE and board[r][c] in [B_R, B_Q, EMPTY_POLE]:
+                            if board[r + dr][c + dc] == EMPTY_POLE:
                                 self.capture_moves.append((r + dr, c + dc))
-                        elif self.is_white_turn == MOVE_BLACK and board[r][c] in [W_R, W_Q]:
-                            if board[r + dr][c + dc] == 0:
+                        elif self.is_white_turn == MOVE_BLACK and board[r][c] in [W_R, W_Q, EMPTY_POLE]:
+                            if board[r + dr][c + dc] == EMPTY_POLE:
                                 self.capture_moves.append((r + dr, c + dc))
                     else:
                         break
@@ -136,7 +140,32 @@ class Class_Checkers:
                     break
 
     def make_move(self, row, col, board):
-        pass
+        """
+        Перемещает выбранную шашку на указанную клетку.
+        """
+        selected_row, selected_col = self.selected_checker
+        checker = board[selected_row][selected_col]
+
+        # Перемещаем шашку на новую клетку
+        board[selected_row][selected_col] = 0  # Очищаем старую клетку
+        board[row][col] = checker  # Помещаем шашку на новую клетку
+
+        # Если шашка достигла конца доски, превращаем её в дамку
+        if checker == W_R and row == 0:  # Белая шашка становится дамкой
+            board[row][col] = W_Q
+        elif checker == B_R and row == ROWS - 1:  # Черная шашка становится дамкой
+            board[row][col] = B_Q
+
+        # Сброс выделенной шашки и списка допустимых ходов
+        self.selected_checker = None
+        self.valid_moves = []
+        self.capture_moves = []
+
+        # Передача хода другому игроку
+        self.count_move += 1
+        if self.count_move == 2:
+            self.count_move = 0
+            self.is_white_turn = self.is_white_turn * (-1)
 
     def make_capture(self, row, col, board):
         pass
@@ -166,17 +195,16 @@ class Class_Checkers:
                     elif checker == B_Q:  # Черная дамка
                         self.screen.blit(self.black_queen, (x, y))
 
-        if not(self.capture_moves == []):
-            # Отрисовка возможных рубок как желтых точек
-            for move in self.capture_moves:
-                row, col = move
-                center_x = col * SQUARE_SIZE + SQUARE_SIZE // 2
-                center_y = row * SQUARE_SIZE + SQUARE_SIZE // 2
-                pygame.draw.circle(self.screen, (255, 255, 0), (center_x, center_y), SQUARE_SIZE // 8)
-        else:
-            # Отрисовка возможных ходов как красные точки
-            for move in self.valid_moves:
-                row, col = move
-                center_x = col * SQUARE_SIZE + SQUARE_SIZE // 2
-                center_y = row * SQUARE_SIZE + SQUARE_SIZE // 2
-                pygame.draw.circle(self.screen, (255, 0, 0), (center_x, center_y), SQUARE_SIZE // 8)
+        # Отрисовка возможных рубок как желтых точек
+        for move in self.capture_moves:
+            row, col = move
+            center_x = col * SQUARE_SIZE + SQUARE_SIZE // 2
+            center_y = row * SQUARE_SIZE + SQUARE_SIZE // 2
+            pygame.draw.circle(self.screen, (255, 255, 0), (center_x, center_y), SQUARE_SIZE // 8)
+
+        # Отрисовка возможных ходов как красные точки
+        for move in self.valid_moves:
+            row, col = move
+            center_x = col * SQUARE_SIZE + SQUARE_SIZE // 2
+            center_y = row * SQUARE_SIZE + SQUARE_SIZE // 2
+            pygame.draw.circle(self.screen, (255, 0, 0), (center_x, center_y), SQUARE_SIZE // 8)
