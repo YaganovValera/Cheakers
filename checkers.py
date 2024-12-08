@@ -24,6 +24,10 @@ class Class_Checkers:
         """
         self.screen = screen
         self.board = board
+
+        self.game_over_white = None
+        self.game_over_black = None
+
         # Флаг для отслеживания текущей стороны
         self.is_white_turn = MOVE_WHITE         # Если 1, ход белых, если -1, ход черных
         self.selected_checker = None            # Ссылка на выбранную шашку
@@ -33,20 +37,12 @@ class Class_Checkers:
         self.valid_moves = []                   # Список допустимых ходов для выбранной шашки
         self.capture_moves = []                 # Список допустимых рубок для выбранной шашки
 
-        self.flag_start_capture = False               # Для отслеживания начала хода при рубке
+        self.flag_start_capture = False         # Для отслеживания начала хода при рубке
 
         self.white_regular = pygame.transform.scale(IMG_WR, (SQUARE_SIZE, SQUARE_SIZE))
         self.black_regular = pygame.transform.scale(IMG_BR, (SQUARE_SIZE, SQUARE_SIZE))
         self.white_queen = pygame.transform.scale(IMG_WQ, (SQUARE_SIZE, SQUARE_SIZE))
         self.black_queen = pygame.transform.scale(IMG_BQ, (SQUARE_SIZE, SQUARE_SIZE))
-
-    def take_move(self):
-        self.valid_moves = []
-        self.capture_moves = []
-        self.selected_checker = None
-        self.count_move += 1
-        if self.count_move == 2:
-            self.count_move = 0
 
     def handle_events(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -64,8 +60,6 @@ class Class_Checkers:
                     if not self.flag_start_capture:
                         self.flag_start_capture = True
                         self.count_move += 1
-                        if self.count_move == 2:
-                            self.count_move = 0
                     self.make_capture(row, col,  self.board.boards[(row+col) % 2])
                 elif not self.flag_have_chop:
                     self.select_checker(row, col, self.board.boards[(row+col) % 2])
@@ -75,6 +69,7 @@ class Class_Checkers:
                     self.flag_start_capture = False
 
     def select_checker(self, row, col, board):
+        """ Проверка на возможность выбрать шашку """
         if self.is_white_turn == MOVE_WHITE:            # Если ход белых
             if board[row][col] in [W_R, W_Q]:
                 self.selected_checker = (row, col)
@@ -121,6 +116,7 @@ class Class_Checkers:
                     and board[capture][col + 2] == EMPTY_POLE:
                 self.capture_moves.append((capture, col + 2))  # Рубка
 
+        # Логика для рубки назад
         capture = row - 2 * self.is_white_turn
         simple_move = row - 1 * self.is_white_turn
         if 0 <= capture < ROWS:
@@ -133,7 +129,7 @@ class Class_Checkers:
 
     def check_queen_moves(self, row, col, board):
         """
-        Проверка возможных ходов для белой дамки.
+        Проверка возможных ходов для дамки.
         """
         # Дамка может двигаться в любом направлении по диагонали, но не может переступать клетки.
         directions = [(-1, -1), (-1, 1), (1, -1),
@@ -155,12 +151,15 @@ class Class_Checkers:
                                 if board[r + dr][c + dc] == EMPTY_POLE:
                                     capture = True
                                     self.capture_moves.append((r + dr, c + dc))
+                                else:
+                                    break
                             elif self.is_white_turn == MOVE_BLACK and board[r][c] in [W_R, W_Q]:
                                 if board[r + dr][c + dc] == EMPTY_POLE:
                                     capture = True
                                     self.capture_moves.append((r + dr, c + dc))
-                            elif self.is_white_turn == MOVE_BLACK and board[r][c] in [B_R, B_Q]\
-                                or self.is_white_turn == MOVE_WHITE and board[r][c] in [W_R, W_Q]:
+                                else:
+                                    break
+                            else:
                                 break
                         else:
                             if board[r + dr][c + dc] == EMPTY_POLE:
@@ -173,6 +172,7 @@ class Class_Checkers:
                     break
 
     def check_capture(self, row, col, board):
+        """ Проверяет возмоджна ли рубка после первого хода"""
         if self.count_move != 1:
             return
 
@@ -186,6 +186,85 @@ class Class_Checkers:
         if len(self.capture_moves) != 0:
             self.flag_have_chop = True
             self.selected_checker = (row, col)
+
+    def check_end_move(self):
+        """ проверка на окончание хода после нажатия на кнопку """
+        if self.count_move == 2:
+            self.count_move = 0
+            self.is_white_turn *= (-1)
+            self.flag_have_chop = False
+            self.valid_moves = []
+            self.capture_moves = []
+            self.selected_checker = None
+
+    def check_end_game(self):
+        """
+        Проверяет окончание игры на белопольной и чернопольной доске.
+        Если у текущего цвета не осталось фигур или они не могут двигаться, игра завершается.
+        """
+
+        for idx, board in enumerate(self.board.boards):
+            if self.game_over_white is not None and idx == 0:
+                continue
+            if self.game_over_black is not None and idx == 1:
+                continue
+
+            original_valid_moves = self.valid_moves.copy()
+            original_capture_moves = self.capture_moves.copy()
+
+            # Определение текущего игрока
+            is_white = idx == 0  # Белопольная доска — индекс 0, чернопольная — индекс 1
+
+            white_pieces = 0
+            black_pieces = 0
+            white_can_move = False
+            black_can_move = False
+
+            # Проход по клеткам доски
+            for row in range(ROWS):
+                for col in range(COLS):
+                    piece = board[row][col]
+
+                    if piece in [W_R, W_Q] and self.is_white_turn == MOVE_WHITE:  # Белые фигуры
+                        white_pieces += 1
+                        if piece == W_R:
+                            self.check_moves(row, col, board)
+                            if self.valid_moves != [] or self.capture_moves != []:
+                                white_can_move = True
+                                break
+                        if piece == W_Q:
+                            self.check_queen_moves(row, col, board)
+                            if self.valid_moves != [] or self.capture_moves != []:
+                                white_can_move = True
+                                break
+                    elif piece in [B_R, B_Q] and self.is_white_turn == MOVE_BLACK:  # Черные фигуры
+                        black_pieces += 1
+                        if piece == B_R:
+                            self.check_moves(row, col, board)
+                            if self.valid_moves != [] or self.capture_moves != []:
+                                black_can_move = True
+                                break
+                        if piece == B_Q:
+                            self.check_queen_moves(row, col, board)
+                            if self.valid_moves != [] or self.capture_moves != []:
+                                black_can_move = True
+                                break
+
+            self.valid_moves = original_valid_moves
+            self.capture_moves = original_capture_moves
+
+            # Проверка окончания игры на белопольной доске
+            if is_white:
+                if self.is_white_turn == MOVE_WHITE and (white_pieces == 0 or not white_can_move):
+                    self.game_over_white = False  # Победили черные
+                elif self.is_white_turn == MOVE_BLACK and (black_pieces == 0 or not black_can_move):
+                    self.game_over_white = True  # Победили белые
+            # Проверка окончания игры на чернопольной доске
+            else:
+                if self.is_white_turn == MOVE_WHITE and (white_pieces == 0 or not white_can_move):
+                    self.game_over_black = False  # Победили черные
+                elif self.is_white_turn == MOVE_BLACK and (black_pieces == 0 or not black_can_move):
+                    self.game_over_black = True  # Победили белые
 
     def make_move(self, row, col, board):
         """
@@ -205,8 +284,12 @@ class Class_Checkers:
             board[row][col] = B_Q
 
         # Передача хода другому игроку
-        self.take_move()
-        if self.count_move == 0:
+        self.valid_moves = []
+        self.capture_moves = []
+        self.selected_checker = None
+        self.count_move += 1
+        if self.count_move == 2:
+            self.count_move = 0
             self.is_white_turn *= (-1)
         else:
             # проверяем, можно ли рубить
@@ -256,7 +339,8 @@ class Class_Checkers:
 
         # Если нет возможных продолжений рубки, завершаем ход
         if len(self.capture_moves) == 0:
-            if self.count_move == 0:
+            if self.count_move == 2:
+                self.count_move = 0
                 self.is_white_turn *= (-1)
             self.flag_have_chop = False
             self.valid_moves = []

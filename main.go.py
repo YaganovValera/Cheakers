@@ -18,7 +18,7 @@ def draw_menu(screen, font):
     """Функция для отрисовки меню."""
     screen.fill(WHITE)  # Очистка экрана
     title = font.render("Меню", True, BLACK)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, HEIGHT // 2 - 100))      # Заголовок
+    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, HEIGHT // 2 - 80))      # Заголовок
 
     for i, option in enumerate(MENU_OPTIONS):
         color = BLUE if i == selected_option else BLACK

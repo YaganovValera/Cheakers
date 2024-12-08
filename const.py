@@ -1,5 +1,5 @@
 
-WIDTH = 800
+WIDTH = 1000
 
 # Параметры окна
 BOARD_WIDTH, HEIGHT = 600, 600
