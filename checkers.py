@@ -159,6 +159,9 @@ class Class_Checkers:
                                 if board[r + dr][c + dc] == EMPTY_POLE:
                                     capture = True
                                     self.capture_moves.append((r + dr, c + dc))
+                            elif self.is_white_turn == MOVE_BLACK and board[r][c] in [B_R, B_Q]\
+                                or self.is_white_turn == MOVE_WHITE and board[r][c] in [W_R, W_Q]:
+                                break
                         else:
                             if board[r + dr][c + dc] == EMPTY_POLE:
                                 self.capture_moves.append((r + dr, c + dc))
@@ -242,6 +245,7 @@ class Class_Checkers:
 
         # Проверка возможности продолжения рубки
         self.capture_moves = []
+        self.valid_moves = []
         if checker in [W_R, B_R]:  # Простая шашка
             self.check_moves(row, col, board)
         elif checker in [W_Q, B_Q]:  # Дамка
