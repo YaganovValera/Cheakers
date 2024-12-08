@@ -19,7 +19,6 @@ class Class_Game:
     def run_game(self):
         while self.running:
             self.handle_events()
-            self.update()
             self.render()
             self.check_game_over()
             self.clock.tick(30)
@@ -29,9 +28,6 @@ class Class_Game:
             if event.type == pygame.QUIT:
                 self.running = False
             self.checkers.handle_events(event)
-
-    def update(self):
-        pass
 
     def render(self):
         self.board.draw_board()
